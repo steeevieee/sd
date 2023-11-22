@@ -1,6 +1,8 @@
 <?php
   $loc = dirname(__FILE__);
 
+  include_once "utils.php";
+
   // LOAD SOURCE XML AND CONFIG
   $file = simplexml_load_file("$loc/xmltv.xml");
   $lines = file("$loc/my.channels", FILE_IGNORE_NEW_LINES);
@@ -26,71 +28,25 @@
   // MUNGE PROGRAMMES
   foreach ($file->programme as $programme)
   {
+    if (strcasecmp($programme->{'title'}, "To Be Announced") == 0)
+//    if ($programme->{'title'} == "To Be Announced")
+    {
+      continue;
+    }
     if (in_array($programme->attributes()->{'channel'}, $lines))
     {
       $newprog = $newdoc->addChild('programme');
-      $skip_cat = 0;
       foreach ($programme->attributes() as $a => $b)
       {
         $newprog->addAttribute($a, $b);
       }
+      $category = best_category(categories($programme, 0));
+      if ($category != "UNDEF")
+      {
+        $newprog->addChild("category", $category);
+      }
       foreach ($programme->children() as $nextgen)
       {
-        if ($skip_cat == 0 && $nextgen->getName() == "category")
-	{
-	  switch ($nextgen)
-          {
-            case "movie":
-            case "Sitcom":
-            case "Adventure":
-            case "Mystery":
-              $newprog->addChild("category", "Movie / Drama");
-              $skip_cat = 1;
-              break;
-            case "News":
-            case "Weather":
-              $newprog->addChild("category", "News / Current Affairs");
-              $skip_cat = 1;
-              break;
-            case "Musical":
-            case "Music":
-              $newprog->addChild("category", "Music / Ballet / Dance");
-              $skip_cat = 1;
-              break;
-            case "sports":
-            case "Cricket":
-              $newprog->addChild("category", "Sports");
-              $skip_cat = 1;
-              break;
-            case "Children":
-            case "Anime":
-              $newprog->addChild("category", "Children's / Youth Programmes");
-              $skip_cat = 1;
-              break;
-            case "Competition reality":
-            case "Reality":
-            case "Cooking":
-            case "Game show":
-            case "Animated":
-            case "Auction":
-            case "Card games":
-            case "Interview":
-              $newprog->addChild("category", "Show / Game Show");
-              $skip_cat = 1;
-              break;
-            case "Documentary":
-            case "Public affairs":
-            case "Travel":
-            case "History":
-              $newprog->addChild("category", "Education / Science / Factual Topics");
-              $skip_cat = 1;
-              break;
-            case "Special":
-              $newprog->addChild("category", "Special");
-              $skip_cat = 1;
-              break;
-          }
-	}
         if ($nextgen->getName() == "episode-num" && $nextgen->attributes()->{'system'} == "xmltv_ns")
         {
           $child = $newprog->addChild($nextgen->getName(), htmlspecialchars($nextgen));
@@ -99,7 +55,16 @@
             $child->addAttribute($a, $b);
           }
         }
-        if ($nextgen->getName() == "title" || $nextgen->getName() == "sub-title" || $nextgen->getName() == "desc")
+        if ($nextgen->getName() == "desc" && $nextgen != "")
+        {
+          $cats = categories($programme, 0);
+          if (count($cats) > 0)
+          {
+            $catstring = " [".implode("][", $cats)."]";
+          }
+          $child = $newprog->addChild("desc", htmlspecialchars($nextgen.$catstring));
+        }
+        if ($nextgen->getName() == "title" || $nextgen->getName() == "sub-title")
         {
           $child = $newprog->addChild($nextgen->getName(), htmlspecialchars($nextgen));
           //foreach ($nextgen->attributes() as $a => $b)
